@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Smart Motion Dashboard — Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+:root{--bg:#f6f8fb;--card:#fff;--muted:#6b7280;--accent:#0ea5a4;--radius:10px}
+*{box-sizing:border-box}
+body{font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);margin:0;color:#0f172a}
+header{background:#06121a;color:var(--card);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+.header-title{font-weight:600;font-size:18px}
+.container{max-width:1100px;margin:22px auto;padding:0 18px}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:18px}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;box-shadow:0 6px 18px rgba(11,15,23,0.06);border:1px solid rgba(15,23,42,0.04)}
+.video-wrap{height:360px;border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center}
+.video-wrap img{width:100%;height:100%;object-fit:cover;display:block}
+.controls{display:flex;flex-direction:column;gap:12px}
+.range{width:100%;height:8px;appearance:none;background:#eef2f7;border-radius:999px;outline:none}
+.range::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 2px 6px rgba(14,165,164,0.3)}
+.range.small{height:6px}
+.small{font-size:13px;color:var(--muted)}
+.flex-between{display:flex;justify-content:space-between;align-items:center}
+.logs{max-height:360px;overflow:auto}
+.table{width:100%;border-collapse:collapse;font-size:14px}
+.table th{font-size:13px;color:var(--muted);text-align:left;padding:10px 6px;border-bottom:1px solid rgba(11,15,23,0.04)}
+.table td{padding:10px 6px;border-bottom:1px solid rgba(11,15,23,0.04)}
+.heatmap{height:240px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+.placeholder{color:var(--muted);font-style:italic}
+@media(max-width:980px){.grid{grid-template-columns:1fr}.video-wrap{height:240px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="header-title">Smart Motion Dashboard — Live</div>
+  <div class="small">Live camera only</div>
+</header>
+
+<div class="container">
+  <div class="grid">
+    <div>
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:10px">
+          <div>
+            <div style="font-weight:700">Live Feed</div>
+            <div class="small">Source: <span id="currentSource">camera</span></div>
+          </div>
+        </div>
+        <div class="video-wrap">
+          <img id="videoFrame" src="/video_feed" alt="Live feed">
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="flex-between" style="margin-bottom:8px">
+          <div style="font-weight:700">Motion Intensity (Live)</div>
+          <div class="small">Last update: <span id="lastUpdate">—</span></div>
+        </div>
+        <canvas id="motionChart" height="150"></canvas>
+      </div>
+    </div>
+
+    <div>
+      <div class="card">
+        <div style="font-weight:700;margin-bottom:8px">Real-Time Controls</div>
+        <div class="controls">
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:600">Detection Threshold</div>
+              <div id="thresholdValue" class="small">25</div>
+            </div>
+            <input id="thresholdSlider" class="range small" type="range" min="5" max="100" value="25">
+          </div>
+
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="font-weight:600">Minimum Motion Area</div>
+              <div id="minAreaValue" class="small">800</div>
+            </div>
+            <input id="minAreaSlider" class="range small" type="range" min="100" max="5000" step="100" value="800">
+          </div>
+
+          <div style="display:flex;gap:8px">
+            <button id="applyBtn" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-weight:600">Apply</button>
+            <button id="resetBtn" style="flex:1;padding:10px;border-radius:8px;border:1px solid rgba(11,15,23,0.06);background:#fff">Reset</button>
+          </div>
+
+          <div style="margin-top:8px">
+            <div style="font-weight:700;margin-bottom:6px">Live Heatmap</div>
+            <div class="heatmap card" style="padding:12px">
+              <img id="heatmapImg" src="" alt="heatmap" style="max-width:100%;max-height:200px;display:none;border-radius:6px;border:1px solid rgba(11,15,23,0.04)">
+              <div id="heatmapPlaceholder" class="placeholder">No heatmap yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <div style="font-weight:700">Recent Motion Events</div>
+          <div class="small">Top 10</div>
+        </div>
+        <div class="logs">
+          <table class="table">
+            <thead><tr><th>Start</th><th>End</th><th>Avg Int</th><th>Class</th></tr></thead>
+            <tbody id="logBody"><tr><td colspan="4" class="placeholder">Loading...</td></tr></tbody>
+          </table>
+        </div>
+        <div style="font-size:12px;color:#6b7280;margin-top:8px">Events stream via SSE</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const thresholdSlider = document.getElementById('thresholdSlider');
+const thresholdValue = document.getElementById('thresholdValue');
+const minAreaSlider = document.getElementById('minAreaSlider');
+const minAreaValue = document.getElementById('minAreaValue');
+const applyBtn = document.getElementById('applyBtn');
+const resetBtn = document.getElementById('resetBtn');
+const heatmapImg = document.getElementById('heatmapImg');
+const heatmapPlaceholder = document.getElementById('heatmapPlaceholder');
+const logBody = document.getElementById('logBody');
+const lastUpdate = document.getElementById('lastUpdate');
+const currentSource = document.getElementById('currentSource');
+
+thresholdSlider.addEventListener('input', ()=> thresholdValue.textContent = thresholdSlider.value);
+minAreaSlider.addEventListener('input', ()=> minAreaValue.textContent = minAreaSlider.value);
+
+applyBtn.addEventListener('click', async ()=>{
+  applyBtn.disabled = true;
+  try{
+    await fetch('/api/set_config', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({threshold: thresholdSlider.value, min_area: minAreaSlider.value})
+    });
+    console.log('config applied');
+  }catch(e){ console.error(e) }
+  applyBtn.disabled = false;
+});
+
+resetBtn.addEventListener('click', ()=>{
+  thresholdSlider.value = 25; minAreaSlider.value = 800;
+  thresholdValue.textContent = 25; minAreaValue.textContent = 800;
+  applyBtn.click();
+});
+
+async function updateHeatmap(){
+  try{
+    const res = await fetch('/api/heatmap_image?t=' + Date.now());
+    if(res.ok){
+      heatmapImg.src = '/api/heatmap_image?t=' + Date.now();
+      heatmapImg.style.display = 'block';
+      heatmapPlaceholder.style.display = 'none';
+    } else {
+      heatmapImg.style.display = 'none';
+      heatmapPlaceholder.style.display = 'block';
+    }
+  }catch(e){ console.error('heatmap', e) }
+}
+
+const es = new EventSource('/api/event-stream');
+es.onmessage = (evt)=>{
+  try{
+    const data = JSON.parse(evt.data);
+    lastUpdate.textContent = new Date().toLocaleTimeString();
+    if(data.log) addLogRow(data.log);
+    if(data.chart) addChartPoint(data.chart);
+  }catch(e){ console.error(e) }
+};
+es.onerror = (e)=> console.warn('SSE error', e);
+
+function addLogRow(log){
+  const first = logBody.querySelector('tr');
+  if(first && first.querySelector('.placeholder')) logBody.innerHTML = '';
+  const tr = document.createElement('tr');
+  tr.innerHTML = `<td>${formatTS(log.start)}</td><td>${formatTS(log.end)}</td><td>${log.intensity ?? '-'}</td><td>${log.classification ?? '-'}</td>`;
+  logBody.prepend(tr);
+  while(logBody.rows.length > 10) logBody.deleteRow(-1);
+}
+function formatTS(ts){ try{ return new Date(ts).toLocaleString() }catch(e){ return ts } }
+
+// chart
+const ctx = document.getElementById('motionChart').getContext('2d');
+const motionChart = new Chart(ctx, {
+  type:'line',
+  data:{ labels:[], datasets:[{ label:'Avg Intensity', data:[], fill:true, tension:0.3, borderColor:'#06b6d4', backgroundColor:'rgba(6,182,212,0.12)', pointRadius:2 }] },
+  options:{ animation:false, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true}} }
+});
+function addChartPoint(pt){
+  motionChart.data.labels.push(pt.label || new Date().toLocaleTimeString());
+  motionChart.data.datasets[0].data.push(pt.data || 0);
+  if(motionChart.data.labels.length > 20){ motionChart.data.labels.shift(); motionChart.data.datasets[0].data.shift(); }
+  motionChart.update('none');
+}
+
+// show current source
+async function updateCurrentSource(){
+  try{
+    const res = await fetch('/api/current_source');
+    if(res.ok){
+      const j = await res.json();
+      currentSource.textContent = (j.current_source||'camera').toString();
+    }
+  }catch(e){ console.error(e) }
+}
+
+updateCurrentSource();
+setInterval(updateHeatmap, 4000);
+setInterval(updateCurrentSource, 5000);
+
+</script>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# Save as .gitignore
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Output files
+output/
+motion_heatmap.png
+*.log
+*.csv
+*.avi
+*.jpg
+
+# IDE / OS files
+.vscode/
+.DS_Store

@@ -1,0 +1,8 @@
+# Save as requirements.txt
+flask
+opencv-python
+ultralytics
+pandas
+numpy
+imutils
+matplotlib
